@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar.jsx'
-import ProfileCard from './components/ProfileCard.jsx'
+import ProfileCard from "./components/ProfileCard"
 import RepoList from './components/RepoList.jsx'
 import Navbar from './components/Navbar.jsx'
 import EmptyState from './components/EmptyState.jsx'
