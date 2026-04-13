@@ -1,157 +1,150 @@
-import React, { useState, useEffect } from "react";
-import ProfileCard from "./components/ProfileCard/ProfileCard.jsx";
-import RepoList from "./components/RepoList/RepoList.jsx";
-import Spinner from "./components/Spinner.jsx";
-import { getCompleteUserData } from "./Services/githubApi.js";
-import StarsForksChart from "./components/StarsForksChart.jsx";
+import { useState, useEffect } from 'react'
+import SearchBar from './components/SearchBar.jsx'
+import ProfileCard from './components/ProfileCard.jsx'
+import RepoList from './components/RepoList.jsx'
+import Navbar from './components/Navbar.jsx'
+import EmptyState from './components/EmptyState.jsx'
+import ErrorState from './components/ErrorState.jsx'
+import LoadingSkeleton from './components/LoadingSkeleton.jsx'
 
-function App() {
-  const [username, setUsername] = useState("octocat");
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // DARK MODE STATE
-  const [theme, setTheme] = useState("light");
+export default function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('darkMode')
+      if (saved !== null) return JSON.parse(saved)
+      return window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    return true
+  })
+  const [username, setUsername] = useState('')
+  const [profile, setProfile] = useState(null)
+  const [repos, setRepos] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [searched, setSearched] = useState(false)
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    localStorage.setItem('darkMode', JSON.stringify(darkMode))
+  }, [darkMode])
 
-  const handleFetch = async () => {
-    setLoading(true);
-    setError("");
-    setData(null);
+  const handleSearch = async (query) => {
+    if (!query.trim()) return
+    setUsername(query.trim())
+    setLoading(true)
+    setError(null)
+    setProfile(null)
+    setRepos([])
+    setSearched(true)
 
     try {
-      const result = await getCompleteUserData(username);
+      const [userRes, reposRes] = await Promise.all([
+        fetch(`https://api.github.com/users/${query.trim()}`),
+        fetch(`https://api.github.com/users/${query.trim()}/repos?sort=updated&per_page=12`),
+      ])
 
-      const sortedRepos = result.repos.sort(
-        (a, b) => b.stargazers_count - a.stargazers_count
-      );
+      if (!userRes.ok) {
+        if (userRes.status === 404) throw new Error('User not found. Please check the username and try again.')
+        if (userRes.status === 403) throw new Error('API rate limit exceeded. Please try again in a few minutes.')
+        throw new Error('Failed to fetch user data. Please try again.')
+      }
 
-      setData({
-        profile: result.profile,
-        repos: sortedRepos,
-      });
+      const userData = await userRes.json()
+      const reposData = reposRes.ok ? await reposRes.json() : []
+
+      setProfile(userData)
+      setRepos(Array.isArray(reposData) ? reposData : [])
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  const handleRetry = () => {
+    if (username) {
+      handleSearch(username)
+    }
+  }
 
   return (
-    <div
-      style={{
-        fontFamily: "sans-serif",
-        padding: "20px",
-        maxWidth: "800px",
-        margin: "0 auto",
-      }}
-    >
-      {/* DARK MODE BUTTON */}
-      <div style={{ textAlign: "right" }}>
-        <button
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          style={{
-            padding: "10px 18px",
-            borderRadius: "30px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "14px",
-            fontWeight: "600",
-            background:
-              theme === "light"
-                ? "linear-gradient(135deg, #222, #444)"
-                : "linear-gradient(135deg, #ffda79, #ffb347)",
-            color: theme === "light" ? "#fff" : "#333",
-            boxShadow:
-              theme === "light"
-                ? "0 4px 10px rgba(0,0,0,0.35)"
-                : "0 4px 10px rgba(255,200,0,0.5)",
-            transition: "all 0.3s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.transform = "scale(1.05)";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = "scale(1)";
-          }}
-        >
-          {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
-        </button>
-      </div>
+    <div className={`min-h-screen transition-colors duration-500 ${
+      darkMode 
+        ? 'bg-surface bg-hero-pattern' 
+        : 'bg-light-bg bg-hero-pattern-light'
+    }`}>
+      <Navbar darkMode={darkMode} onToggleDark={() => setDarkMode(!darkMode)} />
 
-      {/* TITLE */}
-      <h1 style={{ textAlign: "center" }}>GitHub Explorer</h1>
-      <p style={{ textAlign: "center", color: "var(--text)" }}>
-        Search any GitHub username to view profile and repositories.
-      </p>
+      <main className="max-w-5xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+        {/* Hero Section */}
+        <div className="mb-12 text-center animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-4 border transition-colors duration-300
+            dark:bg-surface-card dark:border-surface-border dark:text-brand
+            bg-light-elevated border-light-border text-blue-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            Open Source Tool
+          </div>
+          <h1 className={`text-4xl sm:text-5xl font-bold mb-4 tracking-tight transition-colors duration-300 ${
+            darkMode ? 'text-ink' : 'text-light-ink'
+          }`}>
+            <span className="gradient-text">GitHub</span> Profile Analyzer
+          </h1>
+          <p className={`text-lg max-w-xl mx-auto transition-colors duration-300 ${
+            darkMode ? 'text-ink-muted' : 'text-light-muted'
+          }`}>
+            Discover developers, explore their work, and analyze GitHub profiles with ease.
+          </p>
+        </div>
 
-      {/* SEARCH INPUT */}
-      <div style={{ textAlign: "center", marginBottom: "20px" }}>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Enter GitHub username"
-          style={{
-            padding: "8px",
-            width: "250px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-          }}
-        />
+        {/* Search */}
+        <div className="mb-10 max-w-2xl mx-auto">
+          <SearchBar onSearch={handleSearch} darkMode={darkMode} loading={loading} />
+        </div>
 
-        <button
-          onClick={handleFetch}
-          style={{
-            marginLeft: "10px",
-            padding: "8px 12px",
-            cursor: "pointer",
-            borderRadius: "6px",
-            border: "none",
-            background: "#007bff",
-            color: "#fff",
-            transition: "0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.opacity = "0.85")}
-          onMouseLeave={(e) => (e.target.style.opacity = "1")}
-        >
-          Fetch
-        </button>
-      </div>
+        {/* Content */}
+        <div className="max-w-4xl mx-auto">
+          {loading && <LoadingSkeleton darkMode={darkMode} />}
 
-      {loading && <Spinner />}
+          {!loading && error && (
+            <ErrorState message={error} darkMode={darkMode} onRetry={handleRetry} />
+          )}
 
-      {error && (
-        <p
-          style={{
-            color: "red",
-            textAlign: "center",
-            fontSize: "18px",
-          }}
-        >
-          {error}
-        </p>
-      )}
+          {!loading && !error && !searched && <EmptyState darkMode={darkMode} onSearch={handleSearch} />}
 
-      {data && (
-        <>
-          <ProfileCard profile={data.profile} />
-          <RepoList repos={data.repos} />
+          {!loading && !error && searched && !profile && !error && (
+            <EmptyState darkMode={darkMode} onSearch={handleSearch} />
+          )}
 
-          {/* CHART */}
-          {data.repos.length > 0 && (
-            <div style={{ marginTop: "30px" }}>
-              <StarsForksChart repos={data.repos} />
+          {!loading && !error && profile && (
+            <div className="space-y-8 animate-slide-up">
+              <ProfileCard profile={profile} darkMode={darkMode} />
+              <RepoList repos={repos} darkMode={darkMode} />
             </div>
           )}
-        </>
-      )}
-    </div>
-  );
-}
+        </div>
+      </main>
 
-export default App;
+      {/* Footer */}
+      <footer className={`py-8 text-center text-sm transition-colors duration-300 ${
+        darkMode ? 'text-ink-faint' : 'text-light-muted'
+      }`}>
+        <p>
+          Built with React + Tailwind CSS
+          <span className="mx-2">·</span>
+          <a 
+            href="https://docs.github.com/rest" 
+            target="_blank" 
+            rel="noreferrer"
+            className={`hover:underline transition-colors ${darkMode ? 'hover:text-brand' : 'hover:text-blue-600'}`}
+          >
+            Powered by GitHub API
+          </a>
+        </p>
+      </footer>
+    </div>
+  )
+}
